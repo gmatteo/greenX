@@ -57,11 +57,15 @@ contains
     character(len=long_char), dimension(3)         :: tempStr
     integer                                        :: i, stat, istr
     integer                                        :: lastpos
+    integer                                        :: lskip
     real(kind=dp)                                  :: lower_range, upper_range
 
 
     open(unit=62, file=trim(adjustl(file_name)), status='old', IOSTAT=stat)
     call handle_io_stat(stat, file_name)
+    do lskip = 1,6
+        read(20,*)
+    End do
 
     do
        read(62,'(A)',end=999) line                                ! read in whole line
@@ -85,12 +89,8 @@ contains
           read(tempStr(2),*) lower_range
           read(tempStr(3),*) upper_range
           if(erange > lower_range.and.erange <= upper_range) then
-             do i =  1, 2*npoints
-                if(i <= npoints) then
-                   read(62,*) grid(i)
-                ELSE
-                   read(62,*) weights(i-npoints)
-                endif
+             do i =  1, npoints
+                 read(62,*) grid(i), weights(i)
              enddo
           endif
           EXIT
