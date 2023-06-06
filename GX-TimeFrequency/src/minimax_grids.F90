@@ -50,11 +50,11 @@ contains
   subroutine gx_minimax_grid(num_points, e_min, e_max, &
        tau_points, tau_weights, omega_points, omega_weights, &
        cosft_wt, cosft_tw, sinft_wt, &
-       max_errors, cosft_duality_error, ierr, bare_cos_sin_weights)
+       max_errors, cosft_duality_error, ierr, bare_cos_sin_weights, regterm)
 
     integer, intent(in)                               :: num_points
     real(kind=dp), intent(in)                         :: e_min, e_max
-    real(kind=dp), allocatable, dimension(:), &  
+    real(kind=dp), allocatable, dimension(:), &
          intent(out)                                  :: tau_points, tau_weights
     real(kind=dp), allocatable, dimension(:), &
          intent(out)                                  :: omega_points, omega_weights
@@ -63,6 +63,7 @@ contains
     real(kind=dp), intent(out)                        :: max_errors(3), cosft_duality_error
     logical, intent(in), optional                     :: bare_cos_sin_weights
     integer, intent(out)                              :: ierr
+    real(kind=dp),optional,intent(in)                          :: regterm
 
     ! Internal variables
     logical                                           :: my_bare_cos_sin_weights
@@ -70,7 +71,7 @@ contains
     integer, parameter                                :: cos_w_to_cos_t = 2
     integer, parameter                                :: sin_t_to_sin_w = 3
     integer                                           :: i_point, j_point
-    real(kind=dp)                                     :: e_range, scaling
+    real(kind=dp)                                     :: e_range, scaling, regterm__
     real(kind=dp), dimension(:), allocatable          :: x_tw
     real(kind=dp), dimension(:, :), allocatable       :: mat
     real(kind=dp), dimension(:, :), allocatable       :: tmp_cosft_wt, tmp_cosft_tw
@@ -80,8 +81,10 @@ contains
        my_bare_cos_sin_weights = bare_cos_sin_weights
     endif
 
+    regterm__ = 0.0_dp; if (present(regterm)) regterm__ = regterm
+
     ! Begin work
-    e_range = e_max/e_min   
+    e_range = e_max/e_min
     ierr = 0
 
     ! Allocations
@@ -99,7 +102,7 @@ contains
        allocate (tau_weights(num_points))
     end if
 
-    ! Get the frequency grid points and weights 
+    ! Get the frequency grid points and weights
     call get_points_weights_omega(num_points, e_range, x_tw, ierr)
     if (ierr /= 0) return
 
@@ -107,7 +110,7 @@ contains
     ! Note: the frequency grid points and weights include a factor of two
     scaling = e_min
     omega_points(:) = x_tw(1: num_points) *scaling
-    omega_weights(:) = x_tw(num_points+1: 2* num_points) *scaling   
+    omega_weights(:) = x_tw(num_points+1: 2* num_points) *scaling
 
     ! Get the time grid points and weights
     call get_points_weights_tau(num_points, e_range, x_tw, ierr)
@@ -126,17 +129,17 @@ contains
 
     ! get the weights for the cosine transform W^c(it) -> W^c(iw)
     call get_transformation_weights(num_points, tau_points, omega_points, cosft_wt, e_min, e_max, &
-         max_errors(1), cos_t_to_cos_w, ierr)
+         max_errors(1), cos_t_to_cos_w, regterm__, ierr)
     if (ierr /= 0) return
 
     ! get the weights for the cosine transform W^c(iw) -> W^c(it)
     call get_transformation_weights(num_points, tau_points, omega_points, cosft_tw, e_min, e_max, &
-         max_errors(2), cos_w_to_cos_t, ierr)
+         max_errors(2), cos_w_to_cos_t, regterm__, ierr)
     if (ierr /= 0) return
 
     ! get the weights for the sine transform Sigma^sin(it) -> Sigma^sin(iw) (PRB 94, 165109 (2016), Eq. 71)
     call get_transformation_weights(num_points, tau_points, omega_points, sinft_wt, e_min, e_max, &
-         max_errors(3), sin_t_to_sin_w, ierr)
+         max_errors(3), sin_t_to_sin_w, regterm__, ierr)
     if (ierr /= 0) return
 
     ! Compute the actual weights used for the inhomogeneous cosine/ FT and check whether
@@ -195,7 +198,7 @@ contains
     real(kind=dp), dimension(:), allocatable          :: x_tw
 
     ! Begin work
-    e_range = e_max/e_min   
+    e_range = e_max/e_min
     ierr = 0
 
     ! Allocations
@@ -207,7 +210,7 @@ contains
        allocate (omega_weights(num_points))
     end if
 
-    ! Get the frequency grid points and weights 
+    ! Get the frequency grid points and weights
     call get_points_weights_omega(num_points, e_range, x_tw, ierr)
     if (ierr /= 0) return
 
@@ -229,13 +232,13 @@ contains
   !! @param[inout] weights: corresponding tranformation weights
   !! @param[in] e_min: Minimum transition energy.
   !! @param[in] e_max: Maximum transition energy.
-  !! @param[inout] max_errors: Max error for the three kind of transforms
+  !! @param[inout] max_error: Max error for the transform
   !! @param[in] transformation type : 1 the cosine transform cos(it) -> cos(iw)
   !!                                : 2 the cosine transform cos(iw) -> cos(it)
   !!                                : 3 the sine transform   sin(it) -> sin(iw)
   !! @param[in] ierr: exit status
   subroutine get_transformation_weights(num_points, tau_points, omega_points, weights, e_min, e_max, &
-       max_error, transformation_type, ierr)
+       max_error, transformation_type, regterm, ierr)
 
     integer, intent(in)                                :: num_points
     real(kind=dp), allocatable, dimension(:), &
@@ -248,18 +251,19 @@ contains
     real(kind=dp), intent(inout)                       :: max_error
     integer, intent(in)                                :: transformation_type
     integer, intent(out)                               :: ierr
+    real(kind=dp),intent(in)                  :: regterm
 
     ! Internal variables
     integer                                            :: i_node, i_point, j_point, k_point, &
          num_x_nodes
     integer, parameter                                 :: nodes_factor = 200
-    real(kind=dp)                                      :: current_point, x_factor, regularization
+    real(kind=dp)                                      :: current_point, x_factor
     real(kind=dp), allocatable, dimension(:)           :: weights_work, x_mu, psi
     real(kind=dp), allocatable, dimension(:, :)        :: mat_A
 
     integer                                            :: lwork
-    integer, allocatable, dimension(:)                 :: iwork      
-    real(kind=dp), allocatable, dimension(:)           :: vec_S, vec_UT_psi, work     
+    integer, allocatable, dimension(:)                 :: iwork
+    real(kind=dp), allocatable, dimension(:)           :: vec_S, vec_UT_psi, work
     real(kind=dp), allocatable, dimension(:, :)        :: mat_U, mat_VT, mat_VT_s
 
     ! Begin work
@@ -316,11 +320,11 @@ contains
        ! integration weights = (V Sigma^-1 U^T)*psi
 
        ! 1) V * Sigma^-1
-       regularization = 0.01_dp
+       !regterm = 0.01_dp
        do j_point = 1, num_points
           do k_point = 1, num_points
-             mat_VT_s(k_point, j_point) = mat_VT(j_point, k_point)*vec_S(j_point) / & 
-                                          (vec_S(j_point)**2+regularization**2)
+             mat_VT_s(k_point, j_point) = mat_VT(j_point, k_point)*vec_S(j_point) / &
+                                          (vec_S(j_point)**2+regterm**2)
           end do ! k_point
        end do ! j_point
 
@@ -350,11 +354,11 @@ contains
   !! @param[in] num_x_nodes: Number of node in the interval [e_min,e_max]
   !! @param[in] x_mu : Transition energy (nodes in the interval [e_min,e_max])
   !! @param[inout] psi: corresponding auxiliary function (see transformation type definition)
-  !! @param[inout] mat_A: auxiliary matrix (see transformation type definition)  
+  !! @param[inout] mat_A: auxiliary matrix (see transformation type definition)
   !! @param[in] i_point: pointer for the current grid point
   !! @param[inout] current_point:  current grid point ether omega(i_point) or tau_(i_point)
   !! @param[in] transformation type :
-  !!        (1) the cosine transform cos(it) -> cos(iw): psi(omega,x), mat_A = cos(omega*tau)*psi(tau,x) 
+  !!        (1) the cosine transform cos(it) -> cos(iw): psi(omega,x), mat_A = cos(omega*tau)*psi(tau,x)
   !!        (2) the cosine transform cos(iw) -> cos(it): psi(tau,x)  , mat_A = cos(omega*tau)*psi(omega,x)
   !!        (3) the sine transform   sin(it) -> sin(iw): psi(omega,x), mat_A = sin(omega*tau)*psi(tau,x)
   subroutine calculate_psi_and_mat_A(num_points, tau_points, omega_points, num_x_nodes, x_mu, psi, &
@@ -363,8 +367,8 @@ contains
     integer, intent(in)                                :: num_points, num_x_nodes, i_point
     real(kind=dp), allocatable, dimension(:), &
          intent(in)                                    :: tau_points, omega_points, x_mu
-    real(kind=dp), allocatable, dimension(:), &          
-         intent(inout)                                 :: psi         
+    real(kind=dp), allocatable, dimension(:), &
+         intent(inout)                                 :: psi
     real(kind=dp), allocatable, dimension(:, :), &
          intent(inout)                                 :: mat_A
     real(kind=dp), intent(inout)                       :: current_point
@@ -394,7 +398,7 @@ contains
           end do
        end do
 
-       ! the cosine transform cos(iw) -> cos(it)  
+       ! the cosine transform cos(iw) -> cos(it)
     else if (transformation_type == cosine_wt) then
        tau = tau_points(i_point)
        current_point = tau
@@ -412,7 +416,7 @@ contains
           end do
        end do
 
-       ! the sine transform sin(it) -> sin(iw)         
+       ! the sine transform sin(it) -> sin(iw)
     else if (transformation_type == sine_tw) then
        omega = omega_points(i_point)
        current_point = omega
@@ -442,7 +446,7 @@ contains
   !! @param[in] x_mu : Transition energy (nodes in the interval [e_min,e_max])
   !! @param[in] psi: corresponding auxiliary function (see transformation type definition)
   !! @param[in] current_point:  current grid point ether omega(i_point) or tau_(i_point)
-  !! @param[out] max_errors: Max error for the three kind of transforms   
+  !! @param[out] max_error: Max error for the transform.
   !! @param[in] transformation type : 1 fit function for the cosine transform cos(it) -> cos(iw), psi(omeaga,x)
   !!                                : 2 fit function for the cosine transform cos(iw) -> cos(it), psi(tau,x)
   !!                                : 3 fit function for the sine transform   sin(it) -> sin(iw), psi(omega,x)
@@ -450,12 +454,12 @@ contains
        psi, current_point, max_error, transformation_type)
 
     real(kind=dp), intent(out)                       :: max_error
-    real(kind=dp), intent(in)                        :: current_point      
+    real(kind=dp), intent(in)                        :: current_point
     real(kind=dp), allocatable, dimension(:), &
          intent(in)                                  :: tau_points, omega_points, x_mu, psi, &
          weights_work
     integer, intent(in)                              :: num_points, num_x_nodes
-    integer, intent(in)                              :: transformation_type      
+    integer, intent(in)                              :: transformation_type
 
     ! Internal variables
     integer                                          :: i_node,i_point
@@ -473,7 +477,7 @@ contains
           func_val = 0.0_dp
           ! calculate value of the fit function f(x) = f(x) + weights(omega)cos(omega*tau)psi(tau.x)
           do i_point = 1, num_points
-             tau = tau_points(i_point) 
+             tau = tau_points(i_point)
              func_val = func_val + weights_work(i_point)*cos(omega*tau)*exp(-x_mu(i_node)*tau)
           end do
 

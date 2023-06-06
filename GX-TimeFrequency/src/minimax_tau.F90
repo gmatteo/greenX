@@ -1,10 +1,10 @@
 ! ***************************************************************************************************
-!  Copyright (C) 2020-2023 Green-X library                                                          
-!  This file is distributed under the terms of the APACHE2 License.                                 
-!                                                                                                   
+!  Copyright (C) 2020-2023 Green-X library
+!  This file is distributed under the terms of the APACHE2 License.
+!
 ! ***************************************************************************************************
-!> \brief This module contains the tabulated minimax coefficients that approximate                  
-!>        1/x ~ sum_{i}^{k} w_i exp(-a_i * x) with x \in [1:rc]                                     
+!> \brief This module contains the tabulated minimax coefficients that approximate
+!>        1/x ~ sum_{i}^{k} w_i exp(-a_i * x) with x \in [1:rc]
 !> The arrays containing the coefficients and weights are stored in the `er_aw_aux` derived type.
 !> To extend this module, add the new entries to `tau_npoints_supported`, `energy_ranges_grids`,
 !> and fill the corresponding arrays in the derived type.
@@ -20,7 +20,7 @@ module minimax_tau
 
   private
 
-  !> list wth the number of points supported for the imag-time meshes
+  !> list with the number of points supported for the imag-time meshes
   integer, parameter :: ngrids = 15
   integer, parameter, public :: tau_npoints_supported(ngrids) = &
        [6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34]
@@ -2899,11 +2899,12 @@ contains
   !! @param[in] e_range - the selected energy range
   !! @param[inout] ac_we - vector containing coefficients and weights
   !! @param[out] ierr - error code
-  subroutine get_points_weights_tau(grid_size, e_range, ac_we, ierr)
+  subroutine get_points_weights_tau(grid_size, e_range, ac_we, ierr, erange_list)
     integer, intent(in)                                    :: grid_size
     real(kind=dp), intent(in)                              :: e_range
     real(kind=dp), dimension(2*grid_size), intent(inout)   :: ac_we
     integer, intent(out)                                   :: ierr
+    real(kind=dp),optional,allocatable,intent(out)         :: erange_list(:)
 
     !> Internal variables
     integer                                                :: kloc, bup
@@ -2932,10 +2933,16 @@ contains
     call aw%get_coeff_weight(grid_size, bup, e_range, ac_we, e_ratio)
     ac_we(:) = ac_we(:) * e_ratio
 
+    if (present(erange_list)) then
+      allocate(erange_list(bup))
+      erange_list(:) = aw%energy_range
+    end if
+
     ! Deallocate
     deallocate(aw%energy_range)
     deallocate(aw%aw_erange_matrix)
 
   end subroutine get_points_weights_tau
-  
+
+
 end module minimax_tau
