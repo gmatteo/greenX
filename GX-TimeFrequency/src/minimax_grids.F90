@@ -251,7 +251,7 @@ contains
     real(kind=dp), intent(inout)                       :: max_error
     integer, intent(in)                                :: transformation_type
     integer, intent(out)                               :: ierr
-    real(kind=dp),intent(in)                  :: regterm
+    real(kind=dp),intent(in)                           :: regterm
 
     ! Internal variables
     integer                                            :: i_node, i_point, j_point, k_point, &
@@ -323,8 +323,12 @@ contains
        !regterm = 0.01_dp
        do j_point = 1, num_points
           do k_point = 1, num_points
-             mat_VT_s(k_point, j_point) = mat_VT(j_point, k_point)*vec_S(j_point) / &
-                                          (vec_S(j_point)**2+regterm**2)
+             if (regterm > tiny(regterm)) then
+                 mat_VT_s(k_point, j_point) = mat_VT(j_point, k_point)*vec_S(j_point) / &
+                                              (vec_S(j_point)**2+regterm**2)
+             else
+                mat_VT_s(k_point, j_point) = mat_VT(j_point, k_point) / vec_S(j_point)
+             end if
           end do ! k_point
        end do ! j_point
 

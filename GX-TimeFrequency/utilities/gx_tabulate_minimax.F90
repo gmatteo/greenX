@@ -206,7 +206,7 @@ program gx_tabulate_minimax
 
     case ("eranges")
 
-        write(std_out,*)"<BEGIN ERANGES>"
+        write(std_out,"(a)")"<BEGIN ERANGES>"
         do ii=1, size(tau_npoints_supported)
             ntau = tau_npoints_supported(ii)
             allocate(ac_we(2*ntau))
@@ -217,15 +217,17 @@ program gx_tabulate_minimax
             call handle_gx_ierr(ierr)
 
             same_list = all(abs(tau_erange_list - omega_erange_list) < 1e-6)
-            write(std_out,*)" ntau:", ntau
-            write(std_out,*)" same_list: ", merge(0, 1, same_list)
-            write(std_out,*)" tau_erange_list:", tau_erange_list(:)
-            write(std_out,*)" omega_erange_list:", omega_erange_list(:)
+            write(std_out,"(a)")"<BEGIN ERANGE>"
+            write(std_out,*)"ntau:", ntau
+            write(std_out,*)"same_list: ", merge(1, 0, same_list)
+            write(std_out,*)"tau_erange_list:", tau_erange_list(:)
+            write(std_out,*)"omega_erange_list:", omega_erange_list(:)
+            write(std_out,"(a)")"<END ERANGE>"
 
             if (.not. same_list) then
-                write(std_out,*)" For ntau:", ntau
-                write(std_out,*)" erange for omega and tau are not equal!"
-                write(std_out,*)" tau_erange_list","omega_erange_list", "abs_diff"
+                write(std_out,*)"For ntau:", ntau
+                write(std_out,*)"erange for omega and tau are not equal!"
+                write(std_out,*)"tau_erange_list","omega_erange_list", "abs_diff"
                 do it=1,ntau
                  write(std_out,*)tau_erange_list(it), omega_erange_list(it), &
                                  abs(tau_erange_list(it) - omega_erange_list(it))
@@ -234,7 +236,7 @@ program gx_tabulate_minimax
             end if
             deallocate(tau_erange_list, omega_erange_list, ac_we)
         end do
-        write(std_out,*)"<END ERANGES>"
+        write(std_out,"(a)")"<END ERANGES>"
 
     case default
         write(std_out, *)"Invalid command: ", trim(command)
