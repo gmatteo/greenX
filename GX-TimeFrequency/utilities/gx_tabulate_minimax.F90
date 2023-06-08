@@ -28,7 +28,7 @@ program gx_tabulate_minimax
     !arrays
     real(dp) :: max_errors(3)
     real(dp), allocatable :: tau_mesh(:), tau_wgs(:), iw_mesh(:), iw_wgs(:)
-    real(dp), allocatable :: cosft_wt(:,:), cosft_tw(:,:), sinft_wt(:,:), ac_we(:)
+    real(dp), allocatable :: cosft_wt(:,:), cosft_tw(:,:), sinft_wt(:,:), tau_we(:), omega_we(:)
     real(dp), allocatable :: tau_erange_list(:), omega_erange_list(:)
 
     ! **************************************************************************************************
@@ -205,15 +205,15 @@ program gx_tabulate_minimax
         if (do_plot) call execute_command_line("./gx_minimax_print.py")
 
     case ("eranges")
-
         write(std_out,"(a)")"<BEGIN ERANGES>"
         do ii=1, size(tau_npoints_supported)
             ntau = tau_npoints_supported(ii)
-            allocate(ac_we(2*ntau))
-            call get_points_weights_tau(ntau, e_range, ac_we, ierr, tau_erange_list)
+            allocate(tau_we(2*ntau))
+            call get_points_weights_tau(ntau, e_range, tau_we, ierr, tau_erange_list)
             call handle_gx_ierr(ierr)
 
-            call get_points_weights_omega(ntau, e_range, ac_we, ierr, omega_erange_list)
+            allocate(omega_we(2*ntau))
+            call get_points_weights_omega(ntau, e_range, omega_we, ierr, omega_erange_list)
             call handle_gx_ierr(ierr)
 
             same_list = all(abs(tau_erange_list - omega_erange_list) < 1e-6)
@@ -234,7 +234,7 @@ program gx_tabulate_minimax
                 end do
                 !stop 1
             end if
-            deallocate(tau_erange_list, omega_erange_list, ac_we)
+            deallocate(tau_erange_list, omega_erange_list, tau_we, omega_we)
         end do
         write(std_out,"(a)")"<END ERANGES>"
 
