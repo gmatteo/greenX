@@ -43,7 +43,7 @@ authors:
 affiliations:
  - name: Institute of Condensed Matter and Nanoscience, UCLouvain, B-1348 \ Louvain-la-Neuve,\ Belgium\newline
    index: 1
- - name: Institute of Theoretical Physics, University of Regensburg, D-93053 \ Regensburg,\ Germany\newline
+ - name: Institute of Theoretical Physics and Regensburg Center for Ultrafast Nanoscopy (RUN), University of Regensburg, D-93053 \ Regensburg,\ Germany\newline
    index: 2
  - name: Faculty of Chemistry and Food Chemistry, Technische Universität Dresden, 01062 \ Dresden,\ Germany\newline
    index: 3
@@ -67,7 +67,7 @@ The package comprises minimax time and frequency grids [@Takatsuka2008; @kaltak2
 
 RPA is an accurate approach to compute the electronic correlation energy. It is non-local, includes long-range dispersion interactions and dynamic electronic screening, and is applicable to a wide range of systems from 0 to 3 dimensions [@eshuis2012electron; @ren2012random]. The \textit{GW} method [@hedin1965new] is based on the RPA susceptibility and has become the method of choice for the calculation of direct and inverse photoemission spectra of molecules and solids [@golze2019gw;@reining2018gw;@stankovski2011g;@li2005quasiparticle;@bruneval2008accurate;@nabok2016accurate]. \textit{GW} forms the basis for Bethe-Salpeter Equation (BSE) calculations of optical spectra [@onida2002electronic], where the \textit{GW} results are used as input.
 
-Despite their wide adoption, RPA and \textit{GW} face computational challenges, especially for large systems. Conventional RPA and \textit{GW} implementations scale with the fourth power of the system size $N$ and are therefore usually limited to systems of a few ten to at most hundred atoms [@delben2013electron; @wilhelm2016gw; @stuke2020atomic]. To tackle larger and more realistic systems, scaling reductions present a promising strategy to decrease the computational cost. Such low-scaling algorithms utilize real-space representations and time-frequency transformations, such as the real-space/imaginary-time approach [@rojas1995space] that reduces the complexity to $\mathcal{O}(N^3)$. Several such cubic-scaling \textit{GW} algorithms have recently been implemented, e.g. in a plane-wave/projector-augmented-wave (PAW) \textit{GW} code [@kaltak2014low;@liu2016cubic] or with localized basis sets using Gaussian [@wilhelm2018toward;@wilhelm2021low;@duchemin2021cubic] or Slater-type orbitals [@forster2020low;@foerster2021GW100;@foerster2021loworder;@foerster2023twocomponent]. Similarly, low-scaling RPA algorithms were implemented with different basis sets [@kaltak2014cubic;@kaltak2014low;@wilhelm2016rpa;@luenser2017;@graf2018accurate;@duchemin2019separable;@drontschenko2022efficient;@kutepov2012electronic;@kutepov2017linearized].
+Despite their wide adoption, RPA and \textit{GW} face computational challenges, especially for large systems. Conventional RPA and \textit{GW} implementations scale with the fourth power of the system size $N$ and are therefore usually limited to systems of a few ten to at most hundred atoms [@delben2013electron; @wilhelm2016gw; @stuke2020atomic]. To tackle larger and more realistic systems, scaling reductions present a promising strategy to decrease the computational cost. Such low-scaling algorithms utilize real-space representations and time-frequency transformations, such as the real-space/imaginary-time approach [@rojas1995space] that reduces the complexity to $\mathcal{O}(N^3)$. Several such cubic-scaling \textit{GW} algorithms have recently been implemented, e.g. in a plane-wave/projector-augmented-wave (PAW) \textit{GW} code [@kaltak2014low;@liu2016cubic] or with localized basis sets using Gaussian [@wilhelm2018toward;@wilhelm2021low;@duchemin2021cubic;@Graml2023] or Slater-type orbitals [@forster2020low;@foerster2021GW100;@foerster2021loworder;@foerster2023twocomponent]. Similarly, low-scaling RPA algorithms were implemented with different basis sets [@kaltak2014cubic;@kaltak2014low;@wilhelm2016rpa;@luenser2017;@graf2018accurate;@duchemin2019separable;@drontschenko2022efficient;@kutepov2012electronic;@kutepov2017linearized].
 
 An important consideration for low-scaling algorithms is the crossover point. Due to their larger pre-factor, low-scaling algorithms are typically more expensive for smaller systems and only become more cost effective than canonical implementations for larger systems due to their reduced scaling [@wilhelm2018toward]. Furthermore, the numerical precision of low-scaling \textit{GW} algorithms is strongly coupled to the time-frequency treatment  [@wilhelm2021low]. Early low-scaling \textit{GW} algorithms did not reach the same precision as canonical implementations [@vlcek2017stochastic; @wilhelm2018toward; @forster2020low]. Although appropriate Fourier transforms and corresponding time-frequency grids have been implemented [@liu2016cubic;@wilhelm2021low; @duchemin2021cubic; @foerster2021GW100], these implementations and grids are tied to particular codes and are often buried deeply inside the code. Furthermore, reuse of such implementations elsewhere is often restricted by license requirements or dependencies on definitions made in the host code.
 
@@ -149,58 +149,57 @@ Our library requires as input the grid size $n$, the minimal eigenvalue differen
 \end{align} 
 with $\mathbb{I}$ being the identity matrix. Inputs and outputs are in atomic units.
 
-| Output| Description|Methods using the output|Computation|
-|---|--------|---------|-------|
-|$\{\tau_j^\text{mat}\}_{j=1}^n$&nbsp; &nbsp;  | time points | LT-dMP2, ls RPA, ls \textit{GW} | tabulated + rescaling |     
-|$\{\sigma_j^\text{mat}\}_{j=1}^n$ | time integration weights | LT-dMP2  | tabulated + rescaling      
-|$\{\omega_k^\text{mat}\}_{k=1}^n$ | frequency points | ls & canonical RPA, ls \textit{GW}  | tabulated + rescaling |     
-|$\{\gamma_k^\text{mat}\}_{k=1}^n$ | freq. integration weights | ls & canonical RPA | tabulated + rescaling  |    
-|$\{\delta_{kj}\}_{k,j=1}^n$ | Fourier weights | ls RPA, ls \textit{GW} | on-the-fly L2 opt  
-|  $\{\eta_{jk}\}_{k,j=1}^n$ | Fourier weights | ls \textit{GW} | on-the-fly L2 opt|
-|$\{\lambda_{kj}\}_{k,j=1}^n$ | Fourier weights | ls \textit{GW} | on-the-fly L2 opt  
-|  $\Delta_\text{CT}$ | duality error cosine transforms | ls \textit{GW} | on-the-fly  |
+| Output                                       | Description                     | Methods using the output           | Computation           |
+|----------------------------------------------|---------------------------------|------------------------------------|-----------------------|
+| $\{\tau_j^\text{mat}\}_{j=1}^n$&nbsp; &nbsp; | time points                     | LT-dMP2, ls RPA, ls \textit{GW}    | tabulated + rescaling |     
+| $\{\sigma_j^\text{mat}\}_{j=1}^n$            | time integration weights        | LT-dMP2                            | tabulated + rescaling |
+| $\{\omega_k^\text{mat}\}_{k=1}^n$            | frequency points                | ls & canonical RPA, ls \textit{GW} | tabulated + rescaling |     
+| $\{\gamma_k^\text{mat}\}_{k=1}^n$            | freq. integration weights       | ls & canonical RPA                 | tabulated + rescaling |    
+| $\{\delta_{kj}\}_{k,j=1}^n$                  | Fourier weights                 | ls RPA, ls \textit{GW}             | on-the-fly L2 opt     |
+| $\{\eta_{jk}\}_{k,j=1}^n$                    | Fourier weights                 | ls \textit{GW}                     | on-the-fly L2 opt     |
+| $\{\lambda_{kj}\}_{k,j=1}^n$                 | Fourier weights                 | ls \textit{GW}                     | on-the-fly L2 opt     |
+| $\Delta_\text{CT}$                           | duality error cosine transforms | ls \textit{GW}                     | on-the-fly            |
 : Output returned by the Green-X library. We abbreviate low-scaling as ls, and least-squares optimization as L2 opt.\label{tab:output}
 
 # Structure of the library
 
 The Green-X library [@GitHub;@azizi_minimax] will eventually provide a variety of tools for advanced electronic structure calculations. In this work, we focus on the 'GX-common' and 'GX-TimeFrequency' components. 'GX-common' provides functionality for all library components, such as error handling and unit conversion utilities. 'GX-TimeFrequency' provides an API directory for the time-frequency transformations, a source directory, and a test directory with scripts for verifying the implementation. The relevant directory tree section is:
 
-```bash
-.
-├── CMakeLists.txt
-├── developers.md
-├── Doxyfile
-├── GX-common
-│   ├── CMakeLists.txt
-│   └── src
-│       ├── constants.f90
-│       ├── error_handling.f90
-│       ├── kinds.f90
-│       ├── lapack_interfaces.f90
-│       └── unit_conversion.f90
-├── GX-TimeFrequency
-│   ├── api
-│   │   ├── api_utilities.f90
-│   │   └── gx_minimax.f90
-│   ├── CITATION.cff
-│   ├── CMakeLists.txt
-│   ├── LICENSE-2.0.txt
-│   ├── README.md
-│   ├── src
-│   │   ├── gx_common.h
-│   │   ├── minimax_grids.F90
-│   │   ├── minimax_omega.F90
-│   │   ├── minimax_tau.F90
-│   │   └── minimax_utils.F90
-│   ├── test
-│   │   ├── conftest.py
-│   │   ├── test_gx_minimax_grid.f90
-│   │   ├── test_gx_minimax_grid.py
-│   │   └── test_gx_tabulate_minimax.py
-│   └── utilities
-│       └── gx_tabulate_minimax.F90
-├── LICENSE-2.0.txt
-└── README.md
+```plaintext
+  |- CMakeLists.txt
+  |- developers.md
+  |- Doxyfile
+  |- GX-common
+  |  |- CMakeLists.txt
+  |  |- src
+  |  |  |- constants.f90
+  |  |  |- error_handling.f90
+  |  |  |- kinds.f90
+  |  |  |- lapack_interfaces.f90
+  |  |  |- unit_conversion.f90
+  |- GX-TimeFrequency
+  |  |- api
+  |  |  |- api_utilities.f90
+  |  |  |- gx_minimax.f90
+  |  |- CITATION.cff
+  |  |- CMakeLists.txt
+  |  |- LICENSE.txt
+  |  |- README.md
+  |  |- src
+  |  |  |- gx_common.h
+  |  |  |- minimax_grids.F90
+  |  |  |- minimax_omega.F90
+  |  |  |- minimax_tau.F90
+  |  |  |- minimax_utils.F90
+  |  |- test
+  |  |  |- conftest.py
+  |  |  |- test_gx_minimax_grid.f90
+  |  |  |- test_gx_minimax_grid.py
+  |  |  |- test_gx_tabulate_minimax.py
+  |  |- utilities
+  |  |  |- gx_tabulate_minimax.F90
+  |- LICENSE.txt
+  |- README.md
 ```
 
 Green-X is written in Fortran 2008. Functionality needed for testing and error handling is written in C and Python. We utilize modern Fortran features such as object-oriented programming and intrinsic procedures that are available in Fortran 2008. We have developed a clear interface between the module code (our library) and the client code (MBPT code), promoting better modularity and reusability. Additionally, we use allocatable arrays and automatic deallocation to simplify the code and avoid memory-related issues, such as leaks and dangling pointers. The implementation is robust and reliable, as we use error handling techniques to highlight and recover from exceptions.

@@ -1,7 +1,13 @@
 # GreenX Library 
 
 The Green X library is developed under Work Package 2 of the NOMAD Center of Excellence. 
-It is available under the APACHE2 license, see [LICENSE-2.0.txt](LICENSE-2.0.txt).
+It is available under the APACHE2 [license](LICENSE.txt).
+
+## Libraries
+
+* [GX Time-frequency](GX-TimeFrequency/README.md): Optimised quadrature grids and weights for 
+  RPA and GW imaginary time-frequency transforms.
+
 
 ## Installation
 
@@ -45,8 +51,8 @@ make install
 ## Running the Tests
 
 GreenX uses pytest as its regression testing framework, in conjunction with 
-some custom python modules. First, one must ensure that the python utilities
-are installed. From the GreenX root directory:
+the custom python module `pygreenx`. First, one must ensure that `pygreenx`
+is installed. From the GreenX root directory:
 
 ```bash
 cd python
@@ -72,11 +78,11 @@ ctest
 
 ## Building Documentation
 
-GreenX is documented using Doxygen, and documentation support is enabled by
-default. To disable CMake looking for Doxygen, configure with:
+GreenX is documented using Doxygen, and documentation support is disabled by
+default. To enable CMake looking for Doxygen, configure with:
 
 ```bash
-cmake ../ -DENABLE_DOCS=OFF
+cmake ../ -DENABLE_DOCS=ON
 ```
 
 To build the document, type in the build directory:
@@ -102,6 +108,7 @@ To build Zofu, from GreenX's root (noting that one must define `$GX_ROOT`):
 ```bash
 mkdir external && cd external
 git clone https://github.com/acroucher/zofu.git
+cd zofu
 mkdir build && cd build
 cmake \
    -DCMAKE_BUILD_TYPE=release \
