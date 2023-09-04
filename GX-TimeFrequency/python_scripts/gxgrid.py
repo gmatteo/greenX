@@ -19,13 +19,11 @@ from dataclasses import dataclass
 
 def print_df(df, title=None, file=sys.stdout, excel_filename=None) -> None:
     """
-    Print entire pandas DataFrame.
+    Helper function to print entire pandas DataFrame.
     """
     if title is not None: print(title, file=file)
-    #with pd.option_context('display.max_columns', None):
     with pd.option_context("display.max_rows", len(df),
                            "display.max_columns", len(list(df.keys())),
-                           #"display.precision", precision,
                            ):
         print(df, file=file)
         print("", file=file)
@@ -146,7 +144,7 @@ def _get_plt(pub_settings=False):
 @contextlib.contextmanager
 def cd_tmpdir():
     """
-    Create tmp directory on enter and `cd` to it on enter.
+    Create tmp directory and `cd` to it on enter.
     Remove it and go back to previous dir on exit.
     """
     old_path = os.getcwd()
@@ -159,61 +157,64 @@ def cd_tmpdir():
         shutil.rmtree(workdir)
 
 
-
 @dataclass
 class Eratio:
     """
-    Small object to store the value of emin, emax and pass it to other procedures.
+    Small object used to store the value of emin, emax and pass it to other procedures.
     """
     emin: float
     emax: float
 
     @classmethod
     def from_options(cls, options) -> Eratio | None:
+        """Build object from command line options."""
         if options.emax is None: return None
         return cls(emin=options.emin, emax=options.emax)
 
     @classmethod
     def from_eratio(cls, eratio: float) -> Eratio:
+        """Build object from eratio."""
         return cls(emin=1, emax=eratio)
 
     @property
     def r(self) -> float:
+        """Eratio."""
         return self.emax / self.emin
 
 
 @dataclass
 class Record:
-    ntau: int
-    same_list: bool
-    tau_erange_list: np.ndarray
-    omega_erange_list: np.ndarray
+    ntau: int                        # Number of points.
+    same_list: bool                  # True if tau_erange_list and omega_erange_list are equal (should be)
+    tau_erange_list: np.ndarray      # List of erange values for tau variable.
+    omega_erange_list: np.ndarray    # List of erange values for omega variable.
 
 
 @dataclass
 class MinimaxMesh:
     """
-    This object stores information on a particular minimax mesh.
+    This object stores information on the minimax mesh.
     """
-    ntau: int
-    emin : float
-    emax : float
-    regterm: float
-    taus: np.ndarray
-    tau_weights: np.ndarray
-    omegas: np.ndarray
-    omega_weights: np.ndarray
-    costf_tw: np.ndarray
-    costf_wt: np.ndarray
-    sintf_tw: np.ndarray
+    ntau: int                  # Number of points.
+    emin : float               # Minimum transition energy.
+    emax : float               # Maximum transition energy.
+    regterm: float             # Regularization term.
+    taus: np.ndarray           # tau points.
+    tau_weights: np.ndarray    # tau weights for integration.
+    omegas: np.ndarray         # omega points along the imag. axis.
+    omega_weights: np.ndarray  # omega weights for integration.
+    cosft_tw: np.ndarray       # weights for cosine transform (tau --> omega).
+    cosft_wt: np.ndarray       # weights for cosine transform (omega --> tau).
+    sinft_tw: np.ndarray       # weights for sine transform (tau --> omega).
 
     @add_fig_kwargs
     def plot_ft_weights(self, other: MinimaxMesh, self_name="self", other_name="other",
                         with_sinft=False, fontsize=6, **kwargs):
         """
+        Plot the Fourier transformt weights of two minimax meshes (self and other)
         """
         if self.ntau != other.ntau or self.emin != other.emin or self.emax != other.emax:
-            raise ValueError("Cannot compare Minimax meshes with different parameters")
+            raise ValueError("Cannot compare minimax meshes with different parameters")
 
         import matplotlib.pyplot as plt
         nrows, ncols = (4, 2) if with_sinft else (3, 2)
@@ -223,21 +224,20 @@ class MinimaxMesh:
                                    #subplot_kw={'xticks': [], 'yticks': []},
         )
 
-        Imat = np.eye(self.ntau)
-
+        I_mat = np.eye(self.ntau)
         select_irow = {
-            0: [(self.costf_wt @ self.costf_tw) - Imat,
-                (other.costf_wt @ other.costf_tw) - Imat], # , other.costf_wt @ other.costf_tw],
-            1: [self.costf_wt, other.costf_wt], # self.costf_wt - other.costf_wt],
-            2: [self.costf_tw, other.costf_tw], # self.costf_tw - other.costf_tw],
-            3: [self.sintf_tw, other.sintf_tw], # self.sintf_tw - other.sintf_tw],
+            0: [(self.cosft_wt @ self.cosft_tw) - I_mat,
+                (other.cosft_wt @ other.cosft_tw) - I_mat], # , other.cosft_wt @ other.cosft_tw],
+            1: [self.cosft_wt, other.cosft_wt], # self.cosft_wt - other.cosft_wt],
+            2: [self.cosft_tw, other.cosft_tw], # self.cosft_tw - other.cosft_tw],
+            3: [self.sinft_tw, other.sinft_tw], # self.sinft_tw - other.sinft_tw],
         }
 
         label_irow = {
-            0: [f"(costf_wt @ costf_tw) - I ({self_name})", f"(costf_wt @ costf_tw) - I ({other_name})"],
-            1: [f"costf_wt ({self_name})", f"costf_wt ({other_name})"],
-            2: [f"costf_tw ({self_name})", f"costf_tw ({other_name})"],
-            3: [f"sintf_tw ({self_name})", f"sintf_tw ({other_name})"],
+            0: [f"(cosft_wt @ cosft_tw) - I ({self_name})", f"(cosft_wt @ cosft_tw) - I ({other_name})"],
+            1: [f"cosft_wt ({self_name})", f"cosft_wt ({other_name})"],
+            2: [f"cosft_tw ({self_name})", f"cosft_tw ({other_name})"],
+            3: [f"sinft_tw ({self_name})", f"sinft_tw ({other_name})"],
         }
 
         for irow in range(nrows):
@@ -248,13 +248,19 @@ class MinimaxMesh:
                 fig.colorbar(im, ax=ax)
                 ax.set_title(label, fontsize=fontsize)
 
-        #fig.tight_layout()
         return fig
 
 
 class GxTabulate:
+    """
+    Wraps the gx_tabulate_grids.exe Fortran executable
+    """
 
     def __init__(self, verbose: int):
+        """
+        Args:
+            verbose: Verbosity level.
+        """
         self.verbose = verbose
 
         # Find Fortran executable.
@@ -318,8 +324,8 @@ class GxTabulate:
             print(self)
 
     def __str__(self) -> str:
-        lines = []
-        app = lines.append
+        """String representation."""
+        lines = []; app = lines.append
         app("Info on GreenX Minimax meshes:")
         app(f"Number of meshes: {len(self.rec_ntau)}.")
         for ntau, rec in self.rec_ntau.items():
@@ -331,6 +337,12 @@ class GxTabulate:
 
     def _exec_print(self, ntau, eratio: Eratio, regterm) -> tuple[dict, MinimaxMesh]:
         """
+        Execute the `print` command in a subprocess.
+
+        Args:
+            ntau: Number of points in the minimax mesh.
+            eratio: Eratio object with emin and emax.
+            regterm: Value of the regularization term.
         """
         rec = self.rec_ntau.get(ntau, None)
         if rec is None:
@@ -344,7 +356,7 @@ class GxTabulate:
             process = Popen(cmd, stderr=PIPE, stdout=PIPE, shell=True)
             out, err = process.communicate()
             if process.returncode != 0:
-                raise RuntimeError(f"Command {cmd}\nreturned {process.returncode}")
+                raise RuntimeError(f"Command {cmd} returned {process.returncode}")
 
             #" mesh_index tau tau_weight omega omega_weight cosft_duality_error max_err_costf_t_to_w"// &
             #" max_err_costf_w_to_t max_err_sintf_t_to_w eratio regterm"
@@ -352,20 +364,20 @@ class GxTabulate:
             d = data.iloc[0].to_dict()
             d["ntau"] = ntau
 
-            #  Read FT weigths from dat files ?
+            #  Read FT weigths from dat files.
             # costf_w_to_t.dat cos(wt) already included. array shape: (nw, nt)
             # costf_t_to_w.dat cos(wt) already included. array shape: (nt, nw)
             # sintf_t_to_w.dat sin(wt) already included. array shape: (nw, nt)
-            costf_wt = np.loadtxt("_gx_minimax_print_costf_w_to_t.dat", skiprows=2).T.copy()
-            costf_tw = np.loadtxt("_gx_minimax_print_costf_t_to_w.dat", skiprows=2).T.copy()
-            sintf_tw = np.loadtxt("_gx_minimax_print_sintf_t_to_w.dat", skiprows=2).T.copy()
+            cosft_wt = np.loadtxt("_gx_minimax_print_costf_w_to_t.dat", skiprows=2).T.copy()
+            cosft_tw = np.loadtxt("_gx_minimax_print_costf_t_to_w.dat", skiprows=2).T.copy()
+            sinft_tw = np.loadtxt("_gx_minimax_print_sintf_t_to_w.dat", skiprows=2).T.copy()
 
         keys = "regterm ntau eratio cosft_duality_error max_err_costf_t_to_w max_err_costf_w_to_t max_err_sintf_t_to_w".split()
         d = {k: d[k] for k in keys}
 
         mesh = MinimaxMesh(ntau, eratio.emin, eratio.emax, regterm,
                            data.tau.values, data.tau_weight.values, data.omega.values, data.omega_weight.values,
-                           costf_wt=costf_wt, costf_tw=costf_tw, sintf_tw=sintf_tw,
+                           cosft_wt=cosft_wt, cosft_tw=cosft_tw, sinft_tw=sinft_tw,
                            )
 
         return d, mesh
@@ -375,14 +387,26 @@ class GxTabulate:
         """
         Return dataframe containing the meshes with `ntau` points
         having duality_error larger than `duality_error_tol`.
+
+        Args:
+            ntau: Number of points in the minimax mesh.
+            duality_error_tol: Tolerance on the duality error.
+            regterm: Value of the regularization term.
         """
-        print(f"\nFinding bad minimax meshes with ntau {ntau}, regterm {regterm} and duality error > {duality_error_tol}\n")
-        df, meshes = self.get_df_meshes_ntaus(regterm, ntau_list=[ntau])
+        print(f"\nFinding bad minimax meshes with ntau {ntau}, regterm {regterm} and duality error > {duality_error_tol}...\n")
+        df, meshes = self.get_dataframe_ntaus(regterm, ntau_list=[ntau])
         return df[df["cosft_duality_error"] > duality_error_tol]
 
     def optreg_ntau_eratio(self, ntau: int, eratio: Eratio, regterm_list: list[float],
-                           plot=True):
+                           plot=True) -> tuple[pd.DataFrame, list[MinimaxMesh]]:
         """
+        Perform brute force optimization of regterm for given ntau.
+
+        Args:
+            ntau: Number of points in the minimax mesh.
+            eratio: Eratio object with emin and emax.
+            regterm_list: List of regularization terms to be considered.
+            plot: True to plot results.
         """
         print("\nBegin regfact optimization for ntau:", ntau, "and eratio:", eratio.r, "\n")
         if self.verbose: print("List of regterm values:", regterm_list)
@@ -417,42 +441,54 @@ class GxTabulate:
         return df, meshes
 
     def get_df_meshes_ntau_regterms(self, ntau: int, eratio: Eratio,
-                                    regterm_list: list[float]) -> tuple(pd.DataFrame, list[MinimaxMesh]):
+                                    regterm_list: list[float]) -> tuple[pd.DataFrame, list[MinimaxMesh]]:
         """
+
+        Args:
+           ntau: Number of points in minimax mesh
+           eratio: Eratio object with emin and emax.
+           regerm_list: List of regularization term.
         """
-        dicts, meshes = [], []
+        d_list, meshes = [], []
         for regterm in regterm_list:
             d, mesh = self._exec_print(ntau, eratio, regterm)
-            dicts.append(d)
+            d_list.append(d)
             meshes.append(mesh)
 
-        df = pd.DataFrame(dicts)
+        df = pd.DataFrame(d_list)
         column_names = ["cosft_duality_error", "max_err_costf_t_to_w", "max_err_costf_w_to_t", "max_err_sintf_t_to_w"]
         df["loss_function"] = df[column_names].sum(axis=1)
 
         return df, meshes
 
-    def get_dataframe_ntaus(self, regterm: float,
-                            ntau_list=None) -> tuple(pd.DataFrame, list[MinimaxMesh]):
+    def get_dataframe_ntaus(self, regterm: float, ntau_list=None) -> tuple[pd.DataFrame, list[MinimaxMesh]]:
         """
+
+        Args:
+           regterm: Regularization term.
+           ntau_list: List of ntau points
         """
         if ntau_list is None:
             ntau_list = list(self.rec_ntau.keys())
 
-        dicts, meshes = [], []
+        d_list, meshes = [], []
         for itau, ntau in enumerate(ntau_list):
             rec = self.rec_ntau[ntau]
             for emax in rec.tau_erange_list:
                 eratio = Eratio(emin=1.0, emax=emax - 1e-6)
                 d, mesh = self._exec_print(ntau, eratio, regterm)
-                dicts.append(d)
+                d_list.append(d)
                 meshes.append(mesh)
 
-        return pd.DataFrame(dicts), meshes
+        return pd.DataFrame(d_list), meshes
 
-    def get_meshes_eratio_ntaus(self, eratio: Eratio,
-                                ntau_list=None) -> list[MinimaxMesh]:
+    def get_meshes_eratio_ntaus(self, eratio: Eratio, ntau_list=None) -> list[MinimaxMesh]:
         """
+        Compute minimax meshes and associated errors for the given `eratio` and list of ntau points.
+
+        Args:
+            eratio:
+            ntau_list: List of ntau points. If None all ntaus supported by GreenX are used.
         """
         if ntau_list is None:
             ntau_list = list(self.rec_ntau.keys())
@@ -465,11 +501,18 @@ class GxTabulate:
         return meshes
 
     @add_fig_kwargs
-    def plot_err(self, regterm: float,
-                 ntau_list=None, what_list=None, figsize=(16, 8), cmap="jet", **kwargs):
+    def plot_err(self, regterm: float, ntau_list=None, what_list=None,
+                 figsize=(16, 8), cmap="jet", **kwargs):
         """
+        Plot errors for all ntau, eratio values supported by GreenX.
+
+        Args:
+           regterm: Regularization term.
+            ntau_list:
+            what_list:
         """
-        df, meshes = self.get_df_meshes_ntaus(regterm, ntau_list=ntau_list)
+        df, meshes = self.get_dataframe_ntaus(regterm, ntau_list=ntau_list)
+        df.to_csv("err_ntau.csv")
         print_df(df)
 
         plt = _get_plt()
@@ -506,20 +549,22 @@ class GxTabulate:
             ax.tick_params(axis='both', labelsize=20)
             ax.set_yscale('log')
             ax.set_xlabel("number of time/frequency points", fontsize=20)
-            ax.set_ylabel(r"$\epsilon_{max}/\epsilon_{min}$", fontsize=30)
+            ax.set_ylabel(r"$\varepsilon_{max}/\varepsilon_{min}$", fontsize=30)
             ax.set_title(f'{attr_name} with regterm = {regterm}')
 
         #plt.savefig('regularization_main.eps', dpi=500)
         return fig
 
     @add_fig_kwargs
-    def plot_grids(self, eratio: Eratio,
-                   ntau_list=None, figsize=(16, 8), cmap="jet", **kwargs):
+    def plot_grids(self, eratio: Eratio, ntau_list=None, mode="line",
+                   figsize=(16, 8), cmap="jet", **kwargs):
         """
         Plot all the minimax grids for the given eratio.
 
         Args:
-
+            eratio:
+            ntau_list:
+            mode: "line" for line plot. "scatter" for scatter plot with weights.
         """
         meshes = self.get_meshes_eratio_ntaus(eratio, ntau_list=ntau_list)
 
@@ -527,13 +572,11 @@ class GxTabulate:
         nrows, ncols = 2, 1
         fig, ax_mat = plt.subplots(nrows=nrows, ncols=ncols,
                                    sharex=True, sharey=False, squeeze=False,
-                                   figsize=figsize,
-        )
+                                   figsize=figsize,)
 
         fontsize = 12
         ylabel_iax = {0: "Imaginary frequency (a.u)", 1: "Imaginary time (a.u.)"}
         cmap = plt.get_cmap(cmap)
-        mode = "line"
 
         for iax, ax in enumerate(ax_mat.ravel()):
             for im, mesh in enumerate(meshes):
@@ -542,28 +585,29 @@ class GxTabulate:
 
                 if mode == "line":
                     # Line plot.
-                    plot_style = dict(linestyle="-",
-                                 marker="o",
-                                 color=cmap(im / len(meshes)),
-                                 label=f"N={mesh.ntau}",
-                                )
+                    plot_style = dict(
+                        linestyle="-",
+                        marker="o",
+                        color=cmap(im / len(meshes)),
+                        label=f"N={mesh.ntau}",
+                    )
                     ax.plot(ys, **plot_style)
 
                 elif mode == "scatter":
                     # Scatter plot with weights.
                     xs = np.arange(mesh.ntau)
-                    scatter_style = dict(linestyle="-",
-                                 marker="o",
-                                 color=cmap(im / len(meshes)),
-                                 label=f"N={mesh.ntau}",
-                                 s=sizes,
-                                 edgecolors='black',
-                                )
-
+                    scatter_style = dict(
+                        linestyle="-",
+                        marker="o",
+                        color=cmap(im / len(meshes)),
+                        label=f"N={mesh.ntau}",
+                        s=sizes,
+                        edgecolors='black',
+                    )
                     ax.scatter(xs, ys, **scatter_style)
 
                 else:
-                    raise ValueError(f"Invalid mode: {mode}")
+                    raise ValueError(f"Invalid {mode=}")
 
             if iax == 0:
                 ax.set_title(f"R: {eratio.r}")
@@ -572,6 +616,7 @@ class GxTabulate:
             ax.set_ylabel(ylabel_iax[iax], fontsize=fontsize)
             ax.set_yscale('log')
             ax.legend(loc="best", fontsize=8, shadow=True)
+            ax.grid(True)
 
         return fig
 
@@ -594,7 +639,6 @@ def gxgrid_optreg(options):
     g = GxTabulate(verbose=options.verbose)
 
     regterm_list = [0.0, 1e-10, 1e-9, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3]
-
     ntau = options.ntau
     #ntau =  16; emax = 20 # This is very bad
 
@@ -625,7 +669,7 @@ def gxgrid_optreg_low(options):
     ntau = options.ntau
     rec = g.rec_ntau.get(ntau, None)
     if rec is None:
-        raise ValueError(f"ntau {ntau} should be in {list(g.rec_ntau.keys())})")
+        raise ValueError(f"{ntau=} should be in {list(g.rec_ntau.keys())})")
 
     # Define mesh of erange values
     stop = rec.tau_erange_list[0]
@@ -650,12 +694,12 @@ def gxgrid_optreg_low(options):
         best_rows.append(best_row)
         origin_rows.append(df.iloc[0])
 
-        if ie == 0:
-            # Compare first mesh with optimal one
-            meshes[0].plot_ft_weights(meshes[best_idx], self_name="no_regterm", other_name="with_regterm")
-            raise ValueError()
+        #if ie == 0:
+        #    # Compare first mesh with the optimal one
+        #    meshes[0].plot_ft_weights(meshes[best_idx], self_name="no_regterm", other_name="with_regterm")
+        #    #raise ValueError()
 
-    # Build dataframe with best results and original results with regfact = 0.
+    # Build dataframe with best results and original results obtained with regfact = 0.
     data = {
         "eratio": e_samples,
         "regterm": [row.regterm for row in best_rows],
@@ -681,12 +725,20 @@ def gxgrid_optreg_low(options):
 
 def gxgrid_plot_err(options):
     """
-    Plot duality error for all minimax grids.
+    Plot the duality error for all minimax grids.
     """
     g = GxTabulate(verbose=options.verbose)
-    #ntau_list = [16, 18, 20, 22, 24]
-    ntau_list = [6, 8]
-    g.plot_err(regterm=0.0, ntau_list=ntau_list)
+
+    what_list = [
+        "cosft_duality_error",
+        #"max_err_costf_t_to_w",
+        #"max_err_costf_w_to_t",
+        #"max_err_sintf_t_to_w",
+    ]
+    #if not options.all:
+    #    what_list = [what_list[0]]
+
+    g.plot_err(regterm=options.regterm, what_list=what_list, ntau_list=options.ntau_list)
     return 0
 
 
@@ -700,7 +752,11 @@ def gxgrid_plot_grids(options):
         print("Using default eratio:", eratio, "as emax is not specified in input!")
 
     g = GxTabulate(verbose=options.verbose)
-    g.plot_grids(eratio)
+
+    # TODO: Fix problem with Fortran format for weights.
+    for mode in ["line", "scatter"]:
+        g.plot_grids(eratio, ntau_list=options.ntau_list, mode=mode)
+
     return 0
 
 
@@ -709,6 +765,11 @@ def get_epilog() -> str:
 ================================================
 Usage example:
 
+
+gxgrid.py bad_duality                 -->
+gxgrid.py optreg                      -->
+gxgrid.py optreg_low                  -->
+gxgrid.py plot_err                    -->
 gxgrid.py plot_grids --emax 200       --> Plot grids with R = emax/1
 
 ================================================
@@ -717,7 +778,9 @@ gxgrid.py plot_grids --emax 200       --> Plot grids with R = emax/1
 
 
 def get_parser(with_epilog=False) -> argparse.ArgumentParser:
-
+    """
+    Build and return the CLI parser.
+    """
     DUALITY_ERROR_TOL = 0.1
     parser = argparse.ArgumentParser(epilog=get_epilog() if with_epilog else "",
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -733,43 +796,47 @@ def get_parser(with_epilog=False) -> argparse.ArgumentParser:
                                        description="Valid subcommands, use command --help for help")
 
     def add_opts(p, char_list: list[str]) -> None:
+        """Helper function to add arguments to parser `p`."""
         if "n" in char_list:
             p.add_argument('-n', '--ntau', type=int, required=True, help="Number of mesh points.")
         if "d" in char_list:
             p.add_argument('-d', '--duality-error-tol', type=float, default=DUALITY_ERROR_TOL,
                            help=f"Tolerance on the duality error. Default: {DUALITY_ERROR_TOL}")
         if "r" in char_list:
-            p.add_argument('-r', '--regterm', type=float, default=0.0, help="Reguralization term.")
+            p.add_argument('-r', '--regterm', type=float, default=0.0, help="Reguralization term. Default: 0")
         if "emin" in char_list:
             p.add_argument('--emin', type=float, default=1.0, help="Minimum transition energy (default 1).")
         if "emax" in char_list:
-            p.add_argument('--emax', type=float, default=None, help="Maximum transition energy")
+            p.add_argument('--emax', type=float, default=None, help="Maximum transition energy (default: None)")
+        if "ntau_list" in char_list:
+            p.add_argument("-ns", "--ntau-list", nargs="+", default=None, type=int,
+                           help="List of ntau to analyze e.g. `-n 6 8`. Default: None i.e. all ntaus.")
 
-
-    # Parser for optreg command.
+    # Parser for the optreg command.
     p_optreg = subparsers.add_parser('optreg', parents=[copts_parser], help=gxgrid_optreg.__doc__)
     add_opts(p_optreg, ["n", "d", "emin", "emax"])
 
-    # Parser for optreg_low command.
+    # Parser for the optreg_low command.
     p_optreg_low = subparsers.add_parser('optreg_low', parents=[copts_parser], help=gxgrid_optreg_low.__doc__)
     add_opts(p_optreg_low, ["n", "d", "emin", "emax"])
 
-    # Parser for bad_duality command.
+    # Parser for the bad_duality command.
     p_bad = subparsers.add_parser('bad_duality', parents=[copts_parser], help=gxgrid_bad_duality.__doc__)
     add_opts(p_bad, ["n", "d", "r"])
 
-    # Parser for plot_err command.
+    # Parser for the plot_err command.
     p_plot_err = subparsers.add_parser('plot_err', parents=[copts_parser], help=gxgrid_plot_err.__doc__)
+    add_opts(p_plot_err, ["r", "ntau_list"])
 
-    # Parser for plot_grids command.
+    # Parser for the plot_grids command.
     p_plot_grids = subparsers.add_parser('plot_grids', parents=[copts_parser], help=gxgrid_plot_grids.__doc__)
-    add_opts(p_plot_grids, ["emin", "emax"])
+    add_opts(p_plot_grids, ["emin", "emax", "ntau_list"])
 
     return parser
 
 
 def main() -> int:
-
+    """Main function invoked by the script."""
     def show_examples_and_exit(err_msg=None, error_code=1) -> None:
         """Display the usage of the script."""
         sys.stderr.write(get_epilog())
